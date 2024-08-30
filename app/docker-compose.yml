@@ -1,0 +1,54 @@
+services:
+  backend:
+    container_name: app_backend
+    build: ./backend
+    restart: always
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /app-backend
+    volumes:
+      - ./backend/src:/app-backend/src
+    environment:
+      - APP_PORT=3001
+
+      - POSTGRES_PORT=5432
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=datas_meter
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/datas_meter?schema=public
+    healthcheck:
+      test: ["CMD", "loft", "-t", "-i:3001"]
+      timeout: 10s
+      retries: 5
+    expose:
+      - 3001
+
+  postgres:
+    image: 'postgres:15.1'
+    container_name: datas_meter
+    hostname: postgres
+    platform: linux/x86_64
+    restart: 'always'
+    environment:
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=datas_meter
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+    expose:
+      - 5432
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      timeout: 10s
+      retries: 5
+
+volumes:
+  postgres:
