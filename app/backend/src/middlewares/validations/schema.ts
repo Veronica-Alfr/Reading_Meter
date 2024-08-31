@@ -3,9 +3,9 @@ import Joi from 'joi';
 export const validateDataMeter = (body: object) => {
   const schemaMessage = Joi.object({
     image: Joi.string().required(),
-    customerCode: Joi.number().required(),
+    customerCode: Joi.string().required(),
     measureDatetime: Joi.date().required(),
-    measureType: Joi.string().required(),
+    measureType: Joi.string().valid('WATER', 'GAS').required(),
   });
 
   const { error, value } = schemaMessage.validate(body);

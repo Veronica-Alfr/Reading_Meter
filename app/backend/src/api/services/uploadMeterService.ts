@@ -1,69 +1,82 @@
+/* eslint-disable class-methods-use-this */
 import { PrismaClient } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs';
-import multer from 'multer';
 import genAI from '../IA/genAi';
 import { IUploadBody } from '../../interfaces/IUploadBody';
-// import mime from "mime";
-
-// const upload = multer({ dest: 'uploads/' });
 
 const prisma = new PrismaClient();
 
 class UploadMeterService {
-  public createDataMeter = async ({ image, customerCode, measureDatetime, measureType }: IUploadBody): Promise<object> => {
-    const createdDataBills = await prisma.dataBill.create({
+  // eslint-disable-next-line class-methods-use-this
+  public createDataMeterAndReturnMeasure = async ({ image, customerCode, measureDatetime, measureType }: IUploadBody) => {
+    const createdDataMeter = await prisma.dataMeter.create({
       data: {
-        image: '',
-        customerCode: '',
-        measureDatetime: new Date(''),
-        measureType: '',
+        image,
+        customerCode,
+        measureDatetime: new Date(measureDatetime),
+        measureType,
       },
     });
 
-    if (!createdDataBills) {
-      const err = new Error('Error creating DataBills');
-      err.name = 'Internal Server Error';
+    this.verifyReadingOnMoth(measureDatetime, measureType);
+
+    if (!createdDataMeter) {
+      const err = new Error('Error creating DataMeter!');
       throw err;
     }
 
-    // const mimeType = mime.lookup(image);
-    // if (!mimeType) {
-    //     const err = new Error('Invalid image type');
-    //     err.name = 'BadRequest';
-    //     throw err;
-    // }
+    const measures = this.getMeasure(image);
 
-    const currentDate = new Date();
-    const formattedDate = currentDate.toISOString();
+    return measures;
+  };
 
-    const storage = multer.diskStorage({
-        destination: (req, file, cb) => {
-          cb(null, '/app/backend/src/api/uploads/');
-        },
-        filename: (req, file, cb) => {
-          cb(null, `upload-${formattedDate}-${file.originalname}`);
-        },
+  public verifyReadingOnMoth = async (measureDatetime: Date, measureType: string) => {
+    const getDateTime = await prisma.dataMeter.findMany();
+
+    getDateTime.filter((data) => {
+      const startOfMonthData = data.measureDatetime.getMonth();
+      const endOfMonthData = data.measureDatetime.getFullYear();
+
+      const startOfMonthBody = measureDatetime.getMonth();
+      const endOfMonthBody = measureDatetime.getFullYear();
+
+      if (startOfMonthData === startOfMonthBody && endOfMonthData === endOfMonthBody && data.measureType === measureType) {
+        const err = new Error('There’s already a reading for this type in the current month.');
+        err.name = 'hasReadingError';
+        throw err;
+      }
+
+      return data;
     });
-      
-    const upload = multer({ storage }).single('image') ;
+  };
 
-    const filePath = '/app/backend/src/api/uploads/upload-image.jpeg';
-    fs.writeFileSync(filePath, image);
-    
-    const base64Image = fs.readFileSync(filePath).toString('base64');
-
+  public getMeasure = async (image: string) => {
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const response = await model.generateContent([
       `Observe the uploaded image. If it is a water or gas meter, identify the reading number. 
-        If it is legible, return the value as an integer. If the image is not legible, return 
-        the following message: ‘Unreadable image, please upload a new one!’`,
-      { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
+      If it is legible, return the value as an integer. If the image is not legible, return 
+      the following message: ‘Unreadable image, please upload a new one!’. If the number contains 
+      multiple zeros, return only one zero. If any number on the meter is difficult to see because 
+      it is rotating and therefore incomplete, do not return it, but return up to where the numbers 
+      are visually complete on the meter. Do not use any characters other than numbers as a response.`,
+      { inlineData: { data: image, mimeType: 'image/jpeg' } },
     ]);
 
-    return response;
+    const numberMeter = response.response?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    // return createdDataBills;
+    if (!numberMeter) {
+      const err = new Error('Error finding response. Undefined value.');
+      err.name = 'NotFound';
+      throw err;
+    }
+
+    const datasImgMeasure = {
+      imageUrl: `data:image/png;base64:${image}`,
+      measureValue: Number.parseInt(numberMeter, 10),
+      measureUuid: uuidv4(),
+    };
+
+    return datasImgMeasure;
   };
 }
 

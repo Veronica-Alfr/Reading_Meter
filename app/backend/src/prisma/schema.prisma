@@ -13,10 +13,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model DataBills {
-  measure_uuid  String   @id @default(uuid())
-  image_url     String
-  measure_value Int
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+model DataMeter {
+  id              Int @unique @default(autoincrement())
+  image           String
+  customerCode    String
+  measureDatetime DateTime
+  measureType     String
+  createdAt       DateTime @default(now())
 }

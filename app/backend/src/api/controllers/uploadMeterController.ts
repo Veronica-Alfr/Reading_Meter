@@ -4,14 +4,20 @@ import { validateDataMeter } from '../../middlewares/validations/schema';
 import UploadMeterService from '../services/uploadMeterService';
 
 class UploadMeterController {
-  constructor(private dataMeterService: UploadMeterService ) {}
+  constructor(private dataMeterService: UploadMeterService) {}
 
   public createDataMeter = async (req: Request, res: Response): Promise<object> => {
-    const dataBillsBody: IUploadBody = validateDataMeter(req.body);
+    const dataMeterBody: IUploadBody = validateDataMeter(req.body);
 
-    const createdDataBills = await this.dataMeterService.createDataMeter(dataBillsBody);
+    if (!dataMeterBody) {
+      const err = new Error('The data provided in the request body is invalid.');
+      err.name = 'BadRequest';
+      throw err;
+    }
 
-    return res.status(201).json(createdDataBills);
+    const measures = await this.dataMeterService.createDataMeterAndReturnMeasure(dataMeterBody);
+
+    return res.status(200).json(measures);
   };
 }
 

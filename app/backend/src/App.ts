@@ -27,7 +27,7 @@ class App {
     this.app.use(express.json());
     this.app.use(accessControl);
 
-    this.app.use("/upload", UploadRouter);
+    this.app.use('/upload', UploadRouter);
 
     this.app.use(errorMiddleware);
   }
