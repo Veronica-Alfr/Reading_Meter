@@ -7,50 +7,7 @@ import { IUploadBody } from '../../interfaces/IUploadBody';
 const prisma = new PrismaClient();
 
 class UploadMeterService {
-  // eslint-disable-next-line class-methods-use-this
   public createDataMeterAndReturnMeasure = async ({ image, customerCode, measureDatetime, measureType }: IUploadBody) => {
-    const createdDataMeter = await prisma.dataMeter.create({
-      data: {
-        image,
-        customerCode,
-        measureDatetime: new Date(measureDatetime),
-        measureType,
-      },
-    });
-
-    this.verifyReadingOnMoth(measureDatetime, measureType);
-
-    if (!createdDataMeter) {
-      const err = new Error('Error creating DataMeter!');
-      throw err;
-    }
-
-    const measures = this.getMeasure(image);
-
-    return measures;
-  };
-
-  public verifyReadingOnMoth = async (measureDatetime: Date, measureType: string) => {
-    const getDateTime = await prisma.dataMeter.findMany();
-
-    getDateTime.filter((data) => {
-      const startOfMonthData = data.measureDatetime.getMonth();
-      const endOfMonthData = data.measureDatetime.getFullYear();
-
-      const startOfMonthBody = measureDatetime.getMonth();
-      const endOfMonthBody = measureDatetime.getFullYear();
-
-      if (startOfMonthData === startOfMonthBody && endOfMonthData === endOfMonthBody && data.measureType === measureType) {
-        const err = new Error('There’s already a reading for this type in the current month.');
-        err.name = 'hasReadingError';
-        throw err;
-      }
-
-      return data;
-    });
-  };
-
-  public getMeasure = async (image: string) => {
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const response = await model.generateContent([
       `Observe the uploaded image. If it is a water or gas meter, identify the reading number. 
@@ -67,6 +24,20 @@ class UploadMeterService {
     if (!numberMeter) {
       const err = new Error('Error finding response. Undefined value.');
       err.name = 'NotFound';
+      throw err;
+    }
+
+    const createdDataMeter = await prisma.dataMeter.create({
+      data: {
+        image,
+        customerCode,
+        measureDatetime: new Date(measureDatetime),
+        measureType,
+      },
+    });
+
+    if (!createdDataMeter) {
+      const err = new Error('Error creating DataMeter!');
       throw err;
     }
 
