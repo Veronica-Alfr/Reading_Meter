@@ -15,7 +15,7 @@ class UploadMeterController {
       throw err;
     }
 
-    const measures = await this.dataMeterService.createDataMeterAndReturnMeasure(dataMeterBody);
+    const measures = await this.dataMeterService.createDataMeter(dataMeterBody);
 
     return res.status(200).json(measures);
   };
